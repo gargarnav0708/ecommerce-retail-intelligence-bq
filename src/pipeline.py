@@ -138,8 +138,8 @@ class RetailIntelligencePipeline:
 
     def run_demand_forecasting(self, horizon: int = 30) -> pd.DataFrame:
         """
-        Module 2: Train native BigQuery ML ARIMA_PLUS time-series model and
-        forecast category demand using ML.FORECAST.
+        Module 2: Forecast 30-day category demand using BigQuery's native
+        AI.FORECAST function powered by Google's TimesFM foundation model.
         """
         daily_demand_sql = f"""
         CREATE OR REPLACE TABLE `{self.dataset_ref}.daily_category_demand` AS
@@ -160,35 +160,21 @@ class RetailIntelligencePipeline:
         """
         self.client.query(daily_demand_sql).result()
 
-        arima_sql = f"""
-        CREATE OR REPLACE MODEL `{self.dataset_ref}.demand_forecast_arima`
-        OPTIONS(
-            model_type = 'ARIMA_PLUS',
-            time_series_timestamp_col = 'transaction_date',
-            time_series_data_col = 'daily_units_sold',
-            time_series_id_col = 'category',
-            auto_arima = TRUE,
-            data_frequency = 'DAILY',
-            decompose_time_series = TRUE
-        ) AS
-        SELECT
-            transaction_date,
-            category,
-            daily_units_sold
-        FROM `{self.dataset_ref}.daily_category_demand`
-        """
-        self.client.query(arima_sql).result()
-
         forecast_sql = f"""
         SELECT
             category,
             DATE(forecast_timestamp) AS forecast_date,
             ROUND(forecast_value, 1) AS predicted_units,
             ROUND(GREATEST(0, prediction_interval_lower_bound), 1) AS lower_bound_units,
-            ROUND(prediction_interval_upper_bound, 1) AS upper_bound_units
-        FROM ML.FORECAST(
-            MODEL `{self.dataset_ref}.demand_forecast_arima`,
-            STRUCT({horizon} AS horizon, 0.90 AS confidence_level)
+            ROUND(prediction_interval_upper_bound, 1) AS upper_bound_units,
+            confidence_level
+        FROM AI.FORECAST(
+            TABLE `{self.dataset_ref}.daily_category_demand`,
+            data_col => 'daily_units_sold',
+            timestamp_col => 'transaction_date',
+            id_cols => ['category'],
+            horizon => {horizon},
+            confidence_level => 0.90
         )
         ORDER BY category, forecast_date
         """

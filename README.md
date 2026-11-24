@@ -3,7 +3,7 @@
 An end-to-end e-commerce data engineering, predictive analytics, and generative AI platform built on **Google Cloud BigQuery** using the free public dataset **`bigquery-public-data.thelook_ecommerce`**.
 
 Unlike toy simulations that hardcode SQL string concatenations or fake vector arrays, this repository uses **real BigQuery ML and BigQuery AI (Vertex AI Remote Models)** functions directly in SQL:
-- **`ARIMA_PLUS` & `ML.FORECAST`** for time-series demand forecasting with prediction intervals.
+- **`AI.FORECAST` (`TimesFM`)** for zero-shot deep-learning time-series demand forecasting with prediction intervals (no manual ARIMA tuning required).
 - **`LINEAR_REG`, `ML.EVALUATE` & `ML.PREDICT`** for SKU-level 30-day revenue performance prediction.
 - **`ML.GENERATE_EMBEDDING` (`text-embedding-004`) & `VECTOR_SEARCH`** for 768-dimensional semantic product discovery.
 - **`ML.GENERATE_TEXT` (`gemini-1.5-flash`)** for automated inventory restock and merchandising briefs.
@@ -17,7 +17,7 @@ ecommerce-retail-intelligence-bq/
 ├── aria_bigquery_ai_ecommerce.ipynb          # Clean end-to-end Jupyter Notebook
 ├── sql/
 │   ├── 01_schema_and_validation.sql          # Curated schema (customers, products, transactions) & validation
-│   ├── 02_demand_forecasting.sql             # ARIMA_PLUS training, ML.ARIMA_EVALUATE & ML.FORECAST
+│   ├── 02_demand_forecasting.sql             # Zero-shot deep-learning demand forecasting via AI.FORECAST (TimesFM)
 │   ├── 03_inventory_risk_and_performance.sql # Days-of-Supply stockout risk & LINEAR_REG ML.PREDICT
 │   └── 04_bigquery_ai_semantic_and_genai.sql # ML.GENERATE_EMBEDDING, VECTOR_SEARCH & ML.GENERATE_TEXT
 ├── src/
@@ -39,8 +39,7 @@ Transforms raw tables from `bigquery-public-data.thelook_ecommerce` (`users`, `p
 
 ### 2. Demand Forecasting (`sql/02_demand_forecasting.sql`)
 - Aggregates daily unit sales by product category into `daily_category_demand`.
-- Trains a multi-series BigQuery ML **`ARIMA_PLUS`** model (`demand_forecast_arima`) with `auto_arima = TRUE` and `decompose_time_series = TRUE`.
-- Evaluates AIC and variance via **`ML.ARIMA_EVALUATE`** and forecasts 30-day demand with 90% confidence intervals using **`ML.FORECAST`**.
+- Forecasts 30-day demand with 90% confidence intervals directly in SQL using BigQuery's native **`AI.FORECAST`** function, powered by Google Research's **TimesFM** (Time-Series Foundation Model, a pretrained decoder-only Transformer).
 
 ### 3. Inventory Risk & Product-Performance Prediction (`sql/03_inventory_risk_and_performance.sql`)
 - **Inventory Risk Scoring**: Joins `inventory_items` (unsold stock where `sold_at IS NULL`) with 30-day sales velocity to compute **Days of Supply (DoS)** via `SAFE_DIVIDE`, classifying every SKU into `CRITICAL: Stockout`, `HIGH RISK: < 14 Days Supply`, `MODERATE RISK: 14-30 Days Supply`, `OVERSTOCK: Slow Mover`, or `HEALTHY`.
